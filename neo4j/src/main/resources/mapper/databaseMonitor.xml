@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="db_monitor">
+    <!--查询全量数据库-->
+    <select id="findAllDatabase" resultType="org.kdesign.neo4j.entity.DataBaseNode">
+        <![CDATA[
+            MATCH (db: Database)
+            return db.id as nodeId, db.db_name as dbName, db.db_charset as dbCharset
+        ]]>
+    </select>
+    <!--根据名称查询数据库-->
+    <select id="findDatabaseByName" parameterType="java.lang.String" resultType="org.kdesign.neo4j.entity.DataBaseNode">
+        <![CDATA[
+            MATCH (db: Database)
+            where db.db_name = #{db_name}
+            return db.id as nodeId, db.db_name as dbName, db.db_charset as dbCharset
+        ]]>
+    </select>
+    <!--增加节点-->
+    <update id="addNode" parameterType="java.util.List">
+        CREATE
+        <foreach item="node" index="index" collection="list" open="" separator="," close="">
+            <if test="node.nodeType.equals('Database')">
+                <![CDATA[
+                   (${node.dbName}:Database{ dbName:#{node.dbName} })
+                ]]>
+            </if>
+            <if test="node.nodeType.equals('Table')">
+                <![CDATA[
+                    (${node.dbname}${node.tableName}: Table{tableName:#{node.tableName}, dbName:#{node.dbName}, tableComment:#{node.tableComment} })
+                ]]>
+            </if>
+            <if test="node.nodeType.equals('Column')">
+                <![CDATA[
+                    (${node.dbname}${node.tableName}${node.colName}: Column{colName:#{node.colName}, dbName:#{node.dbName}, tableName:#{node.tableName}, colComment:#{node.colComment}, colDataType:#{node.colDataType}, colSize:#{node.colSize}})
+                ]]>
+            </if>
+        </foreach>
+    </update>
+    <!--增加关系 db->tab-->
+    <update id="add_db2tab_rel">
+        MATCH (db:Database), (tab:Table) WHERE db.dbName = tab.dbName CREATE (db)-[r:db2tab]->(tab)
+    </update>
+    <!--增加关系 tab->col-->
+    <update id="add_tab2col_rel">
+        MATCH (tab:Table), (col: Column) WHERE tab.tableName = col.tableName and tab.dbName = col.dbName CREATE (tab)-[r:tab2col]->(col)
+    </update>
+    <delete id="clearGraph">
+        <![CDATA[
+            MATCH (n) DETACH DELETE n
+        ]]>
+    </delete>
+</mapper>
